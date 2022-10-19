@@ -1,0 +1,57 @@
+def g_gramerf_lib
+def g_nodelabel
+
+pipeline {
+    agent any
+    stages {
+        stage('setup') {
+            agent {
+                label 'graphene_icl_sdp_02'
+            }
+            environment {
+                GRAMERF_GROOVY_LIB='ci/lib/gramerf-groovy-lib.groovy'
+            }
+            steps {
+                script {
+                    checkout scm
+                    echo "Loading groovy library: ${env.GRAMERF_GROOVY_LIB}"
+                    g_gramerf_lib = load(env.GRAMERF_GROOVY_LIB)
+                    g_gramerf_lib.preActions()
+                    g_nodelabel = g_gramerf_lib.getNodeName()
+                    if (g_gramerf_lib.restartNode(g_nodelabel)){
+                        echo "restarted $g_nodelabel successfully..."
+                    } else {
+                        error "Able to restart the execution node $g_nodelabel ..."
+                    }
+                }
+            }
+            post {
+                always {
+                    cleanWs()
+                }
+            }
+        }
+        stage('run performance benchmarking'){
+            agent {
+                label g_nodelabel
+            }
+            steps {
+                script {
+                    checkout scm
+                    if (!run_specific_perf_test?.trim()){
+                        echo " selected marker $run will be executed"
+                        sh "python3 -m pytest -s -v -m $run --ignore=gramine --disable-warnings --perf_config=${perf_config} --build_gramine=${build_gramine} --commit_id=${gramine_repo_commit_id} --iterations=${iterations} --exec_mode=${exec_mode}"
+                    } else {
+                        echo " specific performance test $run_specific_perf_test will be executed"
+                        sh "python3 -m pytest -s -v -k $run_specific_perf_test --ignore=gramine --disable-warnings --perf_config=${perf_config} --build_gramine=${build_gramine} --commit_id=${gramine_repo_commit_id} --iterations=${iterations} --exec_mode=${exec_mode}"
+                    }
+                }
+            }
+            post {
+                always {
+                    cleanWs()
+                }
+            }
+        }
+    }
+}
