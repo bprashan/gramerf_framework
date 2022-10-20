@@ -19,8 +19,8 @@ def verify_output(cmd_output, search_str): return re.search(search_str, cmd_outp
 
 
 # calculate the percent degradation
-def percent_degradation(tcd, baseline, testapp):
-    if 'throughput' in tcd['test_name']:
+def percent_degradation(tcd, baseline, testapp, throughput = False):
+    if 'throughput' in tcd['test_name'] or throughput:
         return '{:0.3f}'.format(100 * (float(baseline) - float(testapp)) / float(baseline))
     else:
         return '{:0.3f}'.format(100 * (float(testapp) - float(baseline)) / float(baseline))
@@ -267,8 +267,8 @@ def write_to_report(workload_name, test_results):
         else:
             generic_dict[k] = test_results[k]
 
-    now = dt.now()
-    report_name = os.path.join(PERF_RESULTS_DIR, "Gramine_Performance_Data_{}".format(dt.isoformat(now)) + ".xlsx")
+    now = dt.isoformat(dt.now()).replace(":","_")
+    report_name = os.path.join(PERF_RESULTS_DIR, "Gramine_Performance_Data_" + now + ".xlsx")
     if not os.path.exists(PERF_RESULTS_DIR): os.makedirs(PERF_RESULTS_DIR)
     if os.path.exists(report_name):
         writer = pd.ExcelWriter(report_name, engine='openpyxl', mode='a')
@@ -276,11 +276,11 @@ def write_to_report(workload_name, test_results):
         writer = pd.ExcelWriter(report_name, engine='openpyxl')
     
     if workload_name == 'Redis':
-        cols = ['native', 'gramine-direct', 'gramine-sgx-single-thread-non-exitless', 'gramine-sgx-diff-core-exitless', \
-                'native-avg', 'direct-avg', 'sgx-single-thread-avg', 'sgx-diff-core-exitless-avg', \
-                'direct-deg', 'sgx-single-thread-deg', 'sgx-diff-core-exitless-deg']
+        cols = ['native', 'gramine-sgx-single-thread-non-exitless', 'gramine-sgx-diff-core-exitless', 'gramine-direct', \
+                'native-avg', 'sgx-single-thread-avg', 'sgx-diff-core-exitless-avg', 'direct-avg', \
+                'sgx-single-thread-deg', 'sgx-diff-core-exitless-deg', 'direct-deg']
     else:
-        cols = ['native', 'gramine-direct', 'gramine-sgx', 'native-avg', 'direct-avg', 'sgx-avg', 'direct-deg', 'sgx-deg']
+        cols = ['native', 'gramine-sgx', 'gramine-direct', 'native-avg', 'sgx-avg', 'direct-avg', 'sgx-deg', 'direct-deg']
 
     if len(throughput_dict) > 0:
         throughput_df = pd.DataFrame.from_dict(throughput_dict, orient='index', columns=cols).dropna(axis=1)

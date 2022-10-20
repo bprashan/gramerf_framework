@@ -232,7 +232,7 @@ class RedisWorkload:
                 sum(test_dict_throughput['gramine-direct'])/len(test_dict_throughput['gramine-direct']))
             if 'native' in tcd['exec_mode']:
                 test_dict_latency['direct-deg'] = utils.percent_degradation(tcd, test_dict_latency['native-avg'], test_dict_latency['direct-avg'])
-                test_dict_throughput['direct-deg'] = utils.percent_degradation(tcd, test_dict_throughput['native-avg'], test_dict_throughput['direct-avg'])
+                test_dict_throughput['direct-deg'] = utils.percent_degradation(tcd, test_dict_throughput['native-avg'], test_dict_throughput['direct-avg'], True)
 
         if 'gramine-sgx-single-thread-non-exitless' in tcd['exec_mode']:
             test_dict_latency['sgx-single-thread-avg'] = '{:0.3f}'.format(
@@ -241,7 +241,7 @@ class RedisWorkload:
                 sum(test_dict_throughput['gramine-sgx-single-thread-non-exitless'])/len(test_dict_throughput['gramine-sgx-single-thread-non-exitless']))
             if 'native' in tcd['exec_mode']:
                 test_dict_latency['sgx-single-thread-deg'] = utils.percent_degradation(tcd, test_dict_latency['native-avg'], test_dict_latency['sgx-single-thread-avg'])
-                test_dict_throughput['sgx-single-thread-deg'] = utils.percent_degradation(tcd, test_dict_throughput['native-avg'], test_dict_throughput['sgx-single-thread-avg'])
+                test_dict_throughput['sgx-single-thread-deg'] = utils.percent_degradation(tcd, test_dict_throughput['native-avg'], test_dict_throughput['sgx-single-thread-avg'], True)
 
         if 'gramine-sgx-diff-core-exitless' in tcd['exec_mode']:
             test_dict_latency['sgx-diff-core-exitless-avg'] = '{:0.3f}'.format(
@@ -250,7 +250,7 @@ class RedisWorkload:
                 sum(test_dict_throughput['gramine-sgx-diff-core-exitless'])/len(test_dict_throughput['gramine-sgx-diff-core-exitless']))
             if 'native' in tcd['exec_mode']:
                 test_dict_latency['sgx-diff-core-exitless-deg'] = utils.percent_degradation(tcd, test_dict_latency['native-avg'], test_dict_latency['sgx-diff-core-exitless-avg'])
-                test_dict_throughput['sgx-diff-core-exitless-deg'] = utils.percent_degradation(tcd, test_dict_throughput['native-avg'], test_dict_throughput['sgx-diff-core-exitless-avg'])
+                test_dict_throughput['sgx-diff-core-exitless-deg'] = utils.percent_degradation(tcd, test_dict_throughput['native-avg'], test_dict_throughput['sgx-diff-core-exitless-avg'], True)
 
         trd[tcd['workload_name']] = trd.get(tcd['workload_name'], {})
         trd[tcd['workload_name']].update({tcd['test_name']+'_latency': test_dict_latency})
