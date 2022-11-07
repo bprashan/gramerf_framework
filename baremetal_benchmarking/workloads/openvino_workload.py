@@ -1,4 +1,6 @@
 import time
+import shutil
+from pathlib import Path
 from common.config_files.constants import *
 from common.libs import utils
 from baremetal_benchmarking import gramine_libs
@@ -68,18 +70,24 @@ class OpenvinoWorkload():
 
     def download_and_convert_model(self, test_config_dict, model_file_path):
         if not os.path.exists(model_file_path):
-            os.chdir("openvino_2021/deployment_tools/open_model_zoo/tools/downloader")
-            download_cmd = "python3 ./downloader.py --name {0} -o {1}/model".format(test_config_dict['model_name'], self.workload_home_dir)
-            convert_cmd = "python3 ./converter.py --name {0} -d {1}/model -o {1}/model".format(test_config_dict['model_name'], self.workload_home_dir)
-            convert_cmd = f"bash -c 'source {self.setupvars_path} && source {self.workload_home_dir}/openvino/bin/activate && {convert_cmd}'"
-            print("\n-- Model download cmd:", download_cmd)
-            utils.exec_shell_cmd(download_cmd, None)
-            print("\n-- Model convert cmd:", convert_cmd)
-            utils.exec_shell_cmd(convert_cmd, None)
+            if test_config_dict['model_name'] == "brain-tumor-segmentation-0001":
+                src_model_path = os.path.join(Path.home(),"Do_not_delete_gramerf_dependencies/brain-tumor-segmentation-0001")
+                if not os.path.exists(src_model_path):
+                    raise Exception(f"\n-- Failure: {src_model_path} not found!! Test model dependency not copied in SUT home folder.")
+                dest_model_path = os.path.join(FRAMEWORK_HOME_DIR, test_config_dict['model_dir'])
+                shutil.copytree(src_model_path, dest_model_path)
+            else:    
+                os.chdir("openvino_2021/deployment_tools/open_model_zoo/tools/downloader")
+                download_cmd = "python3 ./downloader.py --name {0} -o {1}/model".format(test_config_dict['model_name'], self.workload_home_dir)
+                convert_cmd = "python3 ./converter.py --name {0} -d {1}/model -o {1}/model".format(test_config_dict['model_name'], self.workload_home_dir)
+                convert_cmd = f"bash -c 'source {self.setupvars_path} && source {self.workload_home_dir}/openvino/bin/activate && {convert_cmd}'"
+                print("\n-- Model download cmd:", download_cmd)
+                utils.exec_shell_cmd(download_cmd, None)
+                print("\n-- Model convert cmd:", convert_cmd)
+                utils.exec_shell_cmd(convert_cmd, None)
+                os.chdir(self.workload_home_dir)
         else:
             print("\n-- Models are already downloaded.")
-
-        os.chdir(self.workload_home_dir)
 
     def build_and_install_workload(self, test_config_dict):
         print("\n###### In build_and_install_workload #####\n")
