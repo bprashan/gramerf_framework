@@ -2,11 +2,11 @@ def g_gramerf_lib
 def g_nodelabel
 
 pipeline {
-    agent any
+    agent none
     stages {
         stage('setup') {
             agent {
-                label 'graphene_icl_sdp_02'
+                label 'JK_POOL_MASTER'
             }
             environment {
                 GRAMERF_GROOVY_LIB='ci/lib/gramerf-groovy-lib.groovy'
