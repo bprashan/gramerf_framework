@@ -29,8 +29,11 @@ def fresh_gramine_checkout():
 
     commit_id = os.environ["commit_id"]
     if commit_id != '':
-        print("\n-- Checking out following Gramine commit: ", commit_id)
         utils.exec_shell_cmd(f"git checkout {commit_id}")
+    else:
+        commit_id = utils.exec_shell_cmd("git rev-parse HEAD")
+
+    print("\n-- Checked out following Gramine commit: ", commit_id)
 
     print("\n-- Cloning Gramine examples git repo..\n", EXAMPLES_REPO_CLONE_CMD)
     utils.exec_shell_cmd(EXAMPLES_REPO_CLONE_CMD)
