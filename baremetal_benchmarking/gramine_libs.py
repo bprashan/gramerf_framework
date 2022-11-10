@@ -182,6 +182,17 @@ def update_manifest_file(test_config_dict):
 
     shutil.copy2(src_file, dest_file)
 
+    # Following 'if' condition is to mitigate the fix within the below commit,
+    # which is not yet applied to package binaries: 4e724c10210a435c8837875fe2a4e8e50257b9c9
+    # Since the fix is not applied on the package binaries, gramine-sgx execution will
+    # fail when the framework is run with gramine package installation.
+    # So, this if condition must be removed, once the above fix is applied on gramine package.
+    if os.environ["build_gramine"] == "package":
+        max_threads_cmd = f"sed -i 's/^sgx.max_threads/sgx.thread_num/' {dest_file}"
+        print("\n-- Replacing sgx.max_threads with sgx.thread_num within the manifest file..")
+        print(max_threads_cmd)
+        utils.exec_shell_cmd(max_threads_cmd)
+
 
 def generate_sgx_token_and_sig(test_config_dict):
     sgx_exec = len(list(e_mode for e_mode in test_config_dict['exec_mode'] if 'gramine-sgx' in e_mode))
