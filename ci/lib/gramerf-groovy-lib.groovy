@@ -28,13 +28,13 @@ def restartNode(node_label){
 
 def getNodeName(){
 
-    if (run.contains("ov") || run_specific_perf_test.contains("ov")){
+    if (run_specific_perf_test.contains("ov") || run.contains("ov")){
         echo "open vino workload is selected ..."
         return 'graphene_wcity_02'
-    } else if (run.contains("redis") || run_specific_perf_test.contains("redis")){
+    } else if (run_specific_perf_test.contains("redis") || run.contains("redis")){
         echo "redis workload is selected ..."
         return 'graphene_perf_redis_taken_out_for_vasanth'
-    } else if (run.contains("tf") || run_specific_perf_test.contains("tf")) {
+    } else if (run_specific_perf_test.contains("tf") || run.contains("tf")){
         echo "tensorflow workload is selected ..."
         return 'graphene_wcity_02'
     }
