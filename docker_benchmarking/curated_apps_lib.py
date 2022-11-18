@@ -50,10 +50,10 @@ def generate_curated_image(test_config_dict):
     curation_output = ''
     workload_image = test_config_dict["docker_image"]
 
-    curation_cmd = 'python3 curate.py ' + workload_image + ' test'
+    # The following ssh command is to mitigate the curses error faced while launching the command through Jenkins.
+    curation_cmd = f"sshpass -e ssh -tt intel@localhost 'cd {CURATED_APPS_PATH} && python3 curate.py {workload_image} test'"
     
     print("Curation cmd ", curation_cmd)
-    os.chdir(CURATED_APPS_PATH)
     result = subprocess.run([curation_cmd], input=b'\x07', shell=True, check=True, stdout=subprocess.PIPE)
     os.chdir(FRAMEWORK_HOME_DIR)
       
