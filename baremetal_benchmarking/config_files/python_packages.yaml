@@ -4,6 +4,8 @@
 Default:
  asv>=0.5.1
  "meson >=0.56, <0.57"
+ "tomli>=1.1.0"
+ "tomli-w>=0.4.0"
  openpyxl
 
 "18.04":

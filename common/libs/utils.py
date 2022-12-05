@@ -70,8 +70,12 @@ def clean_up_system():
     dentries, inodes and apt cache.
     :return:
     """
-    print("\n-- Removing unnecessary packages and dependencies..")
-    exec_shell_cmd("sudo apt-get -y autoremove", None)
+    try:
+        print("\n-- Removing unnecessary packages and dependencies..")
+        exec_shell_cmd("sudo apt-get -y autoremove", None)
+    except:
+        print("\n-- Executing apt --fix-broken cmd..\n", APT_FIX_BROKEN_CMD)
+        exec_shell_cmd(APT_FIX_BROKEN_CMD, None)
     print("\n-- Clearing thumbnail cache..")
     exec_shell_cmd("sudo rm -rf ~/.cache/thumbnails/*", None)
     print("\n-- Clearing apt cache..")
@@ -167,6 +171,12 @@ def update_env_variables(build_prefix):
         print(f"\n-- PYTHONPATH command\n", PYTHONPATH_CMD)
         os.environ["PYTHONPATH"] = exec_shell_cmd(PYTHONPATH_CMD)
         print(f"\n-- Updated environment PYTHONPATH variable to the following..\n", os.environ["PYTHONPATH"])
+
+    print(f"\n-- Updating 'LC_ALL' env-var\n")
+    os.environ['LC_ALL'] = "C.UTF-8"
+
+    print(f"\n-- Updating 'LANG' env-var\n")
+    os.environ['LANG'] = "C.UTF-8"
 
     print(f"\n-- Updating 'SSHPASS' env-var\n")
     os.environ['SSHPASS'] = "intel@123"

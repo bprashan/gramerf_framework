@@ -65,7 +65,8 @@ fs.mounts = [
 ]
 
 sgx.enclave_size = "32G"
-sgx.max_threads = 256
+#sgx.max_threads = 256
+sgx.thread_num = 256
 sgx.preheat_enclave = true
 sgx.nonpie_binary = true
 
