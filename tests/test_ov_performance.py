@@ -69,46 +69,6 @@ class TestClass:
 
     @pytest.mark.ov_perf
     @pytest.mark.ov_perf_throughput
-    @pytest.mark.ov_perf_brain_tumor_seg_0001
-    @pytest.mark.ov_perf_brain_tumor_seg_0001_throughput
-    @pytest.mark.ov_perf_brain_tumor_seg_0001_fp16_throughput
-    def test_ov_perf_brain_tumor_seg_0001_fp16_throughput(self):
-
-        test_result = run_test(self, tests_yaml_path)
-        assert test_result
-
-    @pytest.mark.ov_perf
-    @pytest.mark.ov_perf_throughput
-    @pytest.mark.ov_perf_brain_tumor_seg_0001
-    @pytest.mark.ov_perf_brain_tumor_seg_0001_throughput
-    @pytest.mark.ov_perf_brain_tumor_seg_0001_fp32_throughput
-    def test_ov_perf_brain_tumor_seg_0001_fp32_throughput(self):
-
-        test_result = run_test(self, tests_yaml_path)
-        assert test_result
-
-    @pytest.mark.ov_perf
-    @pytest.mark.ov_perf_latency
-    @pytest.mark.ov_perf_brain_tumor_seg_0001
-    @pytest.mark.ov_perf_brain_tumor_seg_0001_latency
-    @pytest.mark.ov_perf_brain_tumor_seg_0001_fp16_latency
-    def test_ov_perf_brain_tumor_seg_0001_fp16_latency(self):
-
-        test_result = run_test(self, tests_yaml_path)
-        assert test_result
-
-    @pytest.mark.ov_perf
-    @pytest.mark.ov_perf_latency
-    @pytest.mark.ov_perf_brain_tumor_seg_0001
-    @pytest.mark.ov_perf_brain_tumor_seg_0001_latency
-    @pytest.mark.ov_perf_brain_tumor_seg_0001_fp32_latency
-    def test_ov_perf_brain_tumor_seg_0001_fp32_latency(self):
-
-        test_result = run_test(self, tests_yaml_path)
-        assert test_result
-
-    @pytest.mark.ov_perf
-    @pytest.mark.ov_perf_throughput
     @pytest.mark.ov_perf_brain_tumor_seg_0002
     @pytest.mark.ov_perf_brain_tumor_seg_0002_throughput
     @pytest.mark.ov_perf_brain_tumor_seg_0002_fp16_throughput
@@ -223,6 +183,46 @@ class TestClass:
     @pytest.mark.ov_perf_ssd_mobilenet_latency
     @pytest.mark.ov_perf_ssd_mobilenet_fp32_latency
     def test_ov_perf_ssd_mobilenet_fp32_latency(self):
+
+        test_result = run_test(self, tests_yaml_path)
+        assert test_result
+
+    @pytest.mark.ov_perf
+    @pytest.mark.ov_perf_throughput
+    @pytest.mark.ov_perf_brain_tumor_seg_0001
+    @pytest.mark.ov_perf_brain_tumor_seg_0001_throughput
+    @pytest.mark.ov_perf_brain_tumor_seg_0001_fp16_throughput
+    def test_ov_perf_brain_tumor_seg_0001_fp16_throughput(self):
+
+        test_result = run_test(self, tests_yaml_path)
+        assert test_result
+
+    @pytest.mark.ov_perf
+    @pytest.mark.ov_perf_throughput
+    @pytest.mark.ov_perf_brain_tumor_seg_0001
+    @pytest.mark.ov_perf_brain_tumor_seg_0001_throughput
+    @pytest.mark.ov_perf_brain_tumor_seg_0001_fp32_throughput
+    def test_ov_perf_brain_tumor_seg_0001_fp32_throughput(self):
+
+        test_result = run_test(self, tests_yaml_path)
+        assert test_result
+
+    @pytest.mark.ov_perf
+    @pytest.mark.ov_perf_latency
+    @pytest.mark.ov_perf_brain_tumor_seg_0001
+    @pytest.mark.ov_perf_brain_tumor_seg_0001_latency
+    @pytest.mark.ov_perf_brain_tumor_seg_0001_fp16_latency
+    def test_ov_perf_brain_tumor_seg_0001_fp16_latency(self):
+
+        test_result = run_test(self, tests_yaml_path)
+        assert test_result
+
+    @pytest.mark.ov_perf
+    @pytest.mark.ov_perf_latency
+    @pytest.mark.ov_perf_brain_tumor_seg_0001
+    @pytest.mark.ov_perf_brain_tumor_seg_0001_latency
+    @pytest.mark.ov_perf_brain_tumor_seg_0001_fp32_latency
+    def test_ov_perf_brain_tumor_seg_0001_fp32_latency(self):
 
         test_result = run_test(self, tests_yaml_path)
         assert test_result

@@ -26,16 +26,16 @@ class TestClass:
 
     @pytest.mark.tf_perf
     @pytest.mark.tf_perf_resnet
-    @pytest.mark.tf_perf_resnet_bs_16
-    def test_tf_perf_resnet_bs_16_throughput(self):
+    @pytest.mark.tf_perf_resnet_bs_512
+    def test_tf_perf_resnet_bs_512_throughput(self):
 
         test_result = run_test(self, tests_yaml_path)
         assert test_result
 
     @pytest.mark.tf_perf
     @pytest.mark.tf_perf_resnet
-    @pytest.mark.tf_perf_resnet_bs_512
-    def test_tf_perf_resnet_bs_512_throughput(self):
+    @pytest.mark.tf_perf_resnet_bs_16
+    def test_tf_perf_resnet_bs_16_throughput(self):
 
         test_result = run_test(self, tests_yaml_path)
         assert test_result
