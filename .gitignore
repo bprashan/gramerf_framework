@@ -4,6 +4,7 @@
 /contrib_repo
 /orig_contrib_repo
 /logs
+/.cache
 
 # No editor backup files.
 *.sw*

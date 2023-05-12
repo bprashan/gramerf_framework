@@ -1,0 +1,9 @@
+tqdm
+numpy==1.24.1
+scipy==1.10.0
+daal==2023.0.1
+daal4py==2023.0.1
+pandas==1.5.2
+scikit-learn==1.2.0
+dpcpp-cpp-rt==2023.0.0
+scikit-learn-intelex==2023.0.1

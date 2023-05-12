@@ -1,0 +1,70 @@
+---
+Default:
+  workload_home_dir: "gramine/examples/scikit-learn_bench"
+  workload_name: "Sklearnex"
+  manifest_name: "sklearnex"
+  manifest_file: "sklearnex.manifest.template"
+  config_dir: "configs/sklearn/performance"
+
+test_sklearnex_perf_skl_config:
+  config_name: "skl_config.json"
+  algorithms: "kmeans,kd_tree_knn_clsf"
+  #algorithms: "kmeans,pca,df_clsf,df_regr,ridge,lin_reg,log_reg,svc,nusvc,svr,nusvr,brute_knn_clsf,kd_tree_knn_clsf,train_test_split,elasticnet,tsne"
+
+test_sklearnex_perf_dbscan:
+  config_name: "dbscan.json"
+
+test_sklearnex_perf_df_clsf:
+  config_name: "df_clsf.json"
+
+test_sklearnex_perf_df_regr:
+  config_name: "df_regr.json"
+
+test_sklearnex_perf_elasticnet:
+  config_name: "elasticnet.json"
+
+test_sklearnex_perf_kmeans:
+  config_name: "kmeans.json"
+
+test_sklearnex_perf_knn_clsf:
+  config_name: "knn_clsf.json"
+  algorithms: "brute_knn_clsf,kd_tree_knn_clsf,brute_knn_search"
+
+test_sklearnex_perf_knn_regr:
+  config_name: "knn_regr.json"
+  algorithms: "brute_knn_regr,kd_tree_knn_regr"
+
+test_sklearnex_perf_lasso:
+  config_name: "lasso.json"
+
+test_sklearnex_perf_linear:
+  config_name: "linear.json"
+  algorithms: "lin_reg"
+
+test_sklearnex_perf_log_reg:
+  config_name: "log_reg.json"
+
+test_sklearnex_perf_nusvc:
+  config_name: "nusvc.json"
+
+test_sklearnex_perf_nusvr:
+  config_name: "nusvr.json"
+
+test_sklearnex_perf_pca:
+  config_name: "pca.json"
+
+test_sklearnex_perf_ridge:
+  config_name: "ridge.json"
+
+test_sklearnex_perf_svm:
+  config_name: "svm.json"
+  algorithms: "svc"
+
+test_sklearnex_perf_svr:
+  config_name: "svr.json"
+
+test_sklearnex_perf_train_test_split:
+  config_name: "train_test_split.json"
+
+test_sklearnex_perf_tsne:
+  config_name: "tsne.json"

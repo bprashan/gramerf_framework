@@ -22,6 +22,7 @@ sgx.enclave_size = "32G"
 sgx.max_threads = 196
 
 sgx.preheat_enclave = true
+sgx.edmm_enable = {{ 'true' if env.get('EDMM', '0') == '1' else 'false' }}
 libos.check_invalid_pointers = false
 
 sgx.trusted_files = [

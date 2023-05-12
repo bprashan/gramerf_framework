@@ -193,12 +193,17 @@ def update_manifest_file(test_config_dict):
         print(max_threads_cmd)
         utils.exec_shell_cmd(max_threads_cmd)
 
+    print("EDMM enable is set to ", os.environ["EDMM"])
+    if os.environ["EDMM"] == "1":
+        disable_preheat_cmd = f"sed -i 's/sgx.preheat_enclave = true//' {dest_file}"
+        print("\nDisabling preheat enclave when EDMM is enabled")
+        print(disable_preheat_cmd)
+        utils.exec_shell_cmd(disable_preheat_cmd)
+
 
 def generate_sgx_token_and_sig(test_config_dict):
     sgx_exec = len(list(e_mode for e_mode in test_config_dict['exec_mode'] if 'gramine-sgx' in e_mode))
     if sgx_exec > 0:
+        print("\n-- Generating SGX manifest..")
         sign_cmd = "gramine-sgx-sign --manifest {0}.manifest --output {0}.manifest.sgx".format(test_config_dict['manifest_name'])
-        token_cmd = "gramine-sgx-get-token --output {0}.token --sig {0}.sig".format(test_config_dict['manifest_name'])
-        
         utils.exec_shell_cmd(sign_cmd)
-        utils.exec_shell_cmd(token_cmd)

@@ -1,28 +1,78 @@
 import time
+import shutil
 import glob
 import statistics
 from common.config_files.constants import *
-from docker_benchmarking import curated_apps_lib
+from baremetal_benchmarking import gramine_libs
 from common.libs import utils
 from common.perf_benchmarks import memtier_benchmark
 from conftest import trd
 
-class RedisWorkload:
+
+class MemcachedWorkload:
     def __init__(self, test_config_dict):
-        # Redis home dir => "~/gramerf_framework"
-        # Setting the workload home dir to framework root dir.
-        # Changing to home dir is required for bare-metal case as we build
-        # the workload by downloading its source.
-        # In container case, we would just pull the docker image from the repo
-        # and not build it. So, we do not require any workload home dir here.
-        # Hence, assigning the home dir as framework dir itself and not
-        # changing to it within pre-actions in container case, as we would 
-        # anyways be executing from framework dir.
-        self.workload_home_dir = FRAMEWORK_HOME_DIR
+        # Memcached home dir => "~/gramerf_framework/gramine/CI-Examples/memcached"
+        self.workload_home_dir = os.path.join(FRAMEWORK_HOME_DIR, test_config_dict['workload_home_dir'])
+        # Memcached build dir => "~/gramerf_framework/gramine/CI-Examples/memcached/memcached-1.5.21"
+        self.workload_bld_dir = os.path.join(self.workload_home_dir, "memcached-1.5.21")
         self.server_ip_addr = utils.determine_host_ip_addr()
+        self.command = None
 
     def get_workload_home_dir(self):
         return self.workload_home_dir
+
+    def download_workload(self):
+        # We would not install if the installation dir already exists.
+        if os.path.exists(self.workload_bld_dir):
+            print("\n-- Memcached already downloaded. Not fetching from source..")
+            return True
+
+        src_dir = self.workload_bld_dir + '/src'
+        os.makedirs(src_dir, exist_ok=True)
+
+        tar_file_name = os.path.basename(MEMCACHED_DOWNLOAD_CMD.split()[1])
+        untar_cmd = f"tar -C {src_dir} --strip-components=1 -xf {tar_file_name}"
+
+        print("\n-- Fetching and extracting Memcached workload from source..")
+        utils.exec_shell_cmd(MEMCACHED_DOWNLOAD_CMD)
+        utils.exec_shell_cmd(untar_cmd)
+
+    def build_and_install_workload(self, test_config_dict):
+        print("\n###### In build_and_install_workload #####\n")
+
+        bin_file_name = os.path.join(self.workload_bld_dir, "src", "memcached")
+        if os.path.exists(bin_file_name):
+            print(f"\n-- Memcached binary already built. Proceeding without building..\n")
+            return
+
+        if os.path.exists(self.workload_bld_dir):
+            src_dir = self.workload_bld_dir + '/src'
+            os.chdir(src_dir)
+            utils.exec_shell_cmd('./configure', None)
+            os.chdir(self.workload_bld_dir)
+            memcached_bld_cmd = f"make -C src"
+            print(f"\n-- Building memcached workload..\n", memcached_bld_cmd)
+
+            memcached_make_log = LOGS_DIR + "/memcached" + test_config_dict['test_name'] + '_make.log'
+            log_fd = open(memcached_make_log, "w")
+            utils.exec_shell_cmd(memcached_bld_cmd, log_fd)
+            log_fd.close()
+            os.chdir(self.workload_home_dir)
+        else:
+            raise Exception(f"\n{self.workload_bld_dir} does not exist!")
+            
+    def generate_manifest(self):
+        manifest_cmd = "gramine-manifest -Dlog_level={} -Darch_libdir={} \
+                            memcached.manifest.template > memcached.manifest".format(LOG_LEVEL, os.environ.get('ARCH_LIBDIR'))
+        
+        utils.exec_shell_cmd(manifest_cmd)
+
+    def copy_server_binary(self):
+        bin_file_name = os.path.join(self.workload_bld_dir, "src", "memcached")
+        if not os.path.exists(bin_file_name):
+            raise Exception(f"\n{bin_file_name} does not exist! Please check if the binary was built successfully.")
+        
+        shutil.copy2(bin_file_name, self.workload_home_dir)
 
     def update_server_details_in_client(self, tcd):
         client_name = tcd['client_username'] + "@" + tcd['client_ip']
@@ -35,17 +85,17 @@ class RedisWorkload:
         # Updating Server IP.
         host_sed_cmd = f"sed -i 's/^export HOST.*/export HOST=\"{self.server_ip_addr}\"/' {client_file_path}"
         update_server_ip_cmd = f"sshpass -e ssh {client_name} \"{host_sed_cmd}\""
-        print("\n-- Updating server IP within redis client script..")
+        print("\n-- Updating server IP within memcached client script..")
         print(update_server_ip_cmd)
         utils.exec_shell_cmd(update_server_ip_cmd)
 
         # Updating Server Port.
         # Client scripts are incrementing the port value and then using the result as server port.
         # Hence decreasing the port value by one to replace within the client script.
-        port = tcd['container_server_port'] - 1
+        port = tcd['baremetal_server_port'] - 1
         port_sed_cmd = f"sed -i 's/^export MASTER_START_PORT.*/export MASTER_START_PORT=\"{str(port)}\"/' {client_file_path}"
         update_server_port_cmd = f"sshpass -e ssh {client_name} \"{port_sed_cmd}\""
-        print("\n-- Updating server Port within redis client script..")
+        print("\n-- Updating server Port within memcached client script..")
         print(update_server_port_cmd)
         utils.exec_shell_cmd(update_server_port_cmd)
 
@@ -57,66 +107,64 @@ class RedisWorkload:
         print(test_res_del_cmd)
         utils.exec_shell_cmd(test_res_del_cmd)
 
-    def pull_workload_default_image(self, test_config_dict):
-        workload_docker_image_name = utils.get_workload_name(test_config_dict['docker_image'])
-        workload_docker_pull_cmd = f"docker pull {workload_docker_image_name}"
-        print(f"\n-- Pulling latest redis docker image from docker hub..\n", workload_docker_pull_cmd)
-        utils.exec_shell_cmd(workload_docker_pull_cmd, None)
-
     def pre_actions(self, test_config_dict):
+        os.chdir(self.get_workload_home_dir())
         utils.set_cpu_freq_scaling_governor()
         self.update_server_details_in_client(test_config_dict)
+        gramine_libs.update_manifest_file(test_config_dict)
 
     def setup_workload(self, test_config_dict):
-        # Pull default workload image for native run.
-        self.pull_workload_default_image(test_config_dict)
-        # Create graminized image for gramine direct and sgx runs.
-        curation_output = curated_apps_lib.generate_curated_image(test_config_dict)
-        decode_curation_output = curation_output.decode('utf-8')
-        curation_output_result = curated_apps_lib.verify_image_creation(decode_curation_output)
-        if curation_output_result == False:
-            raise Exception("\n-- Failed to create the curated image!!")
-        print(f"\n-- Successfully created graminized image..")
+        self.download_workload()
+        self.build_and_install_workload(test_config_dict)
+        self.generate_manifest()
+        self.copy_server_binary()
         self.delete_old_test_results(test_config_dict)
+        gramine_libs.generate_sgx_token_and_sig(test_config_dict)
 
-    def free_redis_server_port(self, tcd, e_mode):
-        container_id = None
-        workload_docker_image_name = utils.get_workload_name(tcd['docker_image'])
-        print(f"\n-- Killing docker container with image name: {workload_docker_image_name} to free the server port..")
-        if e_mode != 'native':
-            workload_docker_image_name = "gsc-" + workload_docker_image_name
-        docker_container_list = utils.exec_shell_cmd("docker ps").splitlines()
-        for container_item in docker_container_list:
-            if container_item.split()[1] == workload_docker_image_name:
-                container_id = container_item.split()[0]
-                break
+    def construct_server_workload_exec_cmd(self, test_config_dict, exec_mode = 'native'):
+        memcached_exec_cmd = None
+
+        #server_size = test_config_dict['server_size'] * 1024 * 1024 * 1024
+        exec_bin_str = './memcached' if exec_mode == 'native' else 'memcached'
+
+        #tmp_exec_cmd = f"{exec_bin_str} --port {test_config_dict['baremetal_server_port']} -m {test_config_dict['server_size']} &"
+        tmp_exec_cmd = f"{exec_bin_str} --port {test_config_dict['baremetal_server_port']} -t 16 &"
         
-        if container_id is None:
-            raise Exception(f"\n-- Could not find Container ID for {workload_docker_image_name}")
-        
-        docker_kill_cmd = f"docker stop {container_id}"
-        utils.exec_shell_cmd(docker_kill_cmd)
-    
+        if exec_mode == 'native':
+            memcached_exec_cmd = tmp_exec_cmd
+        elif exec_mode == 'gramine-direct':
+            memcached_exec_cmd = "gramine-direct " + tmp_exec_cmd
+        elif exec_mode == 'gramine-sgx-single-thread-non-exitless':
+            memcached_exec_cmd = "gramine-sgx " + tmp_exec_cmd
+        else:
+            raise Exception(f"\nInvalid execution mode specified in config yaml!")
+
+        print("\n-- Server command name = \n", memcached_exec_cmd)
+        return memcached_exec_cmd
+
+    def free_memcached_server_port(self, tcd):
+        lsof_cmd = f"lsof -t -i:{tcd['baremetal_server_port']}"
+        PID = utils.exec_shell_cmd(lsof_cmd)
+        print(f"\n-- Killing server process {PID} running on port {tcd['baremetal_server_port']}")
+        if PID is not None:
+            kill_cmd = f"kill -9 {PID}"
+            print(kill_cmd)
+            utils.exec_shell_cmd(kill_cmd)
+
     # Build the workload execution command based on execution params and execute it.
     def execute_workload(self, tcd, e_mode, test_dict=None):
         print("\n##### In execute_workload #####\n")
 
         print(f"\n-- Executing {tcd['test_name']} in {e_mode} mode")
 
-        workload_docker_image_name = utils.get_workload_name(tcd['docker_image'])
-        if e_mode == 'native':
-            # Pull and bring up the native redis server.
-            docker_native_cmd = f"docker run --rm --net=host -t {workload_docker_image_name} --protected-mode no --save '' &"
-            print(f"\n-- Launching Redis server in {e_mode} mode..\n", docker_native_cmd)
-            utils.exec_shell_cmd(docker_native_cmd, None)
-        else:
-            docker_run_cmd = curated_apps_lib.get_docker_run_command(workload_docker_image_name)
-            docker_run_cmd += " --protected-mode no --save ''"
-            print(f"\n-- Launching Redis server in {e_mode} mode..\n", docker_run_cmd)
-            result = curated_apps_lib.run_curated_image(tcd, docker_run_cmd)
-            if result == False:
-                raise Exception(f"\n-- Failure - Couldn't launch redis server in {e_mode} mode!!")
+        self.command = self.construct_server_workload_exec_cmd(tcd, e_mode)
+        if self.command is None:
+            raise Exception(
+                f"\n-- Failure: Unable to construct command for {tcd['test_name']} Exec_mode: {e_mode}")
 
+        # Bring up the memcached server.
+        utils.exec_shell_cmd(self.command, None)
+        
         time.sleep(5)
 
         # Construct and execute memtier benchmark command within client.
@@ -125,7 +173,7 @@ class RedisWorkload:
         
         time.sleep(5)
 
-        self.free_redis_server_port(tcd, e_mode)
+        self.free_memcached_server_port(tcd)
 
         time.sleep(TEST_SLEEP_TIME_BW_ITERATIONS)
 
@@ -162,9 +210,6 @@ class RedisWorkload:
                 elif "graphene_sgx_single_thread" in filename:
                     test_dict_latency['gramine-sgx-single-thread-non-exitless'].append(float(avg_latency))
                     test_dict_throughput['gramine-sgx-single-thread-non-exitless'].append(float(avg_throughput))
-                elif "graphene_sgx_diff_core" in filename:
-                    test_dict_latency['gramine-sgx-diff-core-exitless'].append(float(avg_latency))
-                    test_dict_throughput['gramine-sgx-diff-core-exitless'].append(float(avg_throughput))
                 else:
                     test_dict_latency['gramine-direct'].append(float(avg_latency))
                     test_dict_throughput['gramine-direct'].append(float(avg_throughput))
@@ -187,19 +232,12 @@ class RedisWorkload:
                 test_dict_latency['sgx-single-thread-deg'] = utils.percent_degradation(tcd, test_dict_latency['native-avg'], test_dict_latency['sgx-single-thread-avg'])
                 test_dict_throughput['sgx-single-thread-deg'] = utils.percent_degradation(tcd, test_dict_throughput['native-avg'], test_dict_throughput['sgx-single-thread-avg'], True)
 
-        if 'gramine-sgx-diff-core-exitless' in tcd['exec_mode']:
-            test_dict_latency['sgx-diff-core-exitless-avg'] = '{:0.3f}'.format(statistics.median(test_dict_latency['gramine-sgx-diff-core-exitless']))
-            test_dict_throughput['sgx-diff-core-exitless-avg'] = '{:0.3f}'.format(statistics.median(test_dict_throughput['gramine-sgx-diff-core-exitless']))
-            if 'native' in tcd['exec_mode']:
-                test_dict_latency['sgx-diff-core-exitless-deg'] = utils.percent_degradation(tcd, test_dict_latency['native-avg'], test_dict_latency['sgx-diff-core-exitless-avg'])
-                test_dict_throughput['sgx-diff-core-exitless-deg'] = utils.percent_degradation(tcd, test_dict_throughput['native-avg'], test_dict_throughput['sgx-diff-core-exitless-avg'], True)
-
         trd[tcd['workload_name']] = trd.get(tcd['workload_name'], {})
         trd[tcd['workload_name']].update({tcd['test_name']+'_latency': test_dict_latency})
         trd[tcd['workload_name']].update({tcd['test_name']+'_throughput': test_dict_throughput})
 
         os.chdir(self.workload_home_dir)
-        
+
     def process_results(self, tcd):
         csv_res_folder = os.path.join(PERF_RESULTS_DIR, tcd['workload_name'])
         if not os.path.exists(csv_res_folder): os.makedirs(csv_res_folder)

@@ -1,0 +1,46 @@
+---
+Default:
+  workload_home_dir: "gramine/CI-Examples/memcached/"
+  original_manifest_file: "memcached.manifest.template"
+  timeout: 3000
+  workload_name: "Memcached"
+  manifest_name: "memcached"
+  manifest_file: "memcached.manifest.template.non-exitless"
+  server_size: 4096
+  baremetal_server_port: 11211
+  container_server_port: 11211
+  client_ip: "10.66.247.185"
+  client_username: "intel"
+  client_scripts_path: "/home/intel/perf_benchmarking/gramerf_redis_client"
+  client_results_path: "/home/intel/perf_benchmarking/redis-6.0.6/log/set/"
+  rw_ratio: "1:1"
+  docker_image: memcached memcached
+  
+test_memcached_perf_48_data_size_1_1_rw_ratio:
+  data_size: 48
+
+test_memcached_perf_48_data_size_1_9_rw_ratio:
+  data_size: 48
+  rw_ratio: "1:9"
+
+test_memcached_perf_1024_data_size_1_1_rw_ratio:
+  data_size: 1024
+
+test_memcached_perf_1024_data_size_1_9_rw_ratio:
+  data_size: 1024
+  rw_ratio: "1:9"
+
+test_memcached_perf_4096_data_size_1_1_rw_ratio:
+  data_size: 4096
+
+test_memcached_perf_4096_data_size_1_9_rw_ratio:
+  data_size: 4096
+  rw_ratio: "1:9"
+
+test_memcached_perf_77824_data_size_1_1_rw_ratio:
+  data_size: 77824
+
+test_memcached_perf_77824_data_size_1_9_rw_ratio:
+  data_size: 77824
+  rw_ratio: "1:9"
+  

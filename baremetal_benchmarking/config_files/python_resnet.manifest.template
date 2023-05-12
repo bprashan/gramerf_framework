@@ -62,12 +62,16 @@ fs.mounts = [
   { path = "{{ pythondistpath }}", uri = "file:{{ pythondistpath }}"},
   { path = "/tmp", uri = "file:/tmp"},
   { path = "/etc", uri = "file:/etc"},
+  # encrypted file mount
 ]
+
+# encrypted insecure__keys
 
 sgx.enclave_size = "32G"
 sgx.max_threads = 300
 sgx.preheat_enclave = true
 sgx.nonpie_binary = true
+sgx.edmm_enable = {{ 'true' if env.get('EDMM', '0') == '1' else 'false' }}
 
 sgx.trusted_files = [
   "file:{{ gramine.runtimedir() }}/",
@@ -88,4 +92,5 @@ sgx.allowed_files = [
   "file:/tmp/",
   "file:/etc/",
   "file:models/",
+  # encrypted allowed file
 ]

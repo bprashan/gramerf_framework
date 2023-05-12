@@ -1,0 +1,65 @@
+---
+Default:
+  workload_name: "MySql"
+  docker_image: mysql mysql:8.0.32-debian
+  debug_mode: "n"
+
+test_mysql_perf_read_only_1_threads:
+  threads: 1
+  operation: "oltp_read_only"
+
+test_mysql_perf_read_only_8_threads:
+  threads: 8
+  operation: "oltp_read_only"
+
+test_mysql_perf_read_only_16_threads:
+  threads: 16
+  operation: "oltp_read_only"
+
+test_mysql_perf_read_only_32_threads:
+  threads: 32
+  operation: "oltp_read_only"
+
+test_mysql_perf_read_only_64_threads:
+  threads: 64
+  operation: "oltp_read_only"
+
+test_mysql_perf_write_only_1_threads:
+  threads: 1
+  operation: "oltp_write_only"
+
+test_mysql_perf_write_only_8_threads:
+  threads: 8
+  operation: "oltp_write_only"
+
+test_mysql_perf_write_only_16_threads:
+  threads: 16
+  operation: "oltp_write_only"
+
+test_mysql_perf_write_only_32_threads:
+  threads: 32
+  operation: "oltp_write_only"
+
+test_mysql_perf_write_only_64_threads:
+  threads: 64
+  operation: "oltp_write_only"
+
+test_mysql_perf_read_write_1_threads:
+  threads: 1
+  operation: "oltp_read_write"
+
+test_mysql_perf_read_write_8_threads:
+  threads: 8
+  operation: "oltp_read_write"
+
+test_mysql_perf_read_write_16_threads:
+  threads: 16
+  operation: "oltp_read_write"
+
+test_mysql_perf_read_write_32_threads:
+  threads: 32
+  operation: "oltp_read_write"
+
+test_mysql_perf_read_write_64_threads:
+  threads: 64
+  operation: "oltp_read_write"

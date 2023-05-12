@@ -17,7 +17,7 @@ class TensorflowWorkload():
     def get_workload_home_dir(self):
         return self.workload_home_dir
         
-    def download_workload(self, test_config_dict):
+    def download_workload(self):
         if sys.version_info < (3, 6):
             raise Exception("Please upgrade Python version to atleast 3.6 or higher before executing this workload.")
 
@@ -45,21 +45,36 @@ class TensorflowWorkload():
             print("\n-- Downloading BERT checkpoints models..")
             utils.exec_shell_cmd(TF_BERT_CHECKPOINTS_WGET_CMD, None)
             utils.exec_shell_cmd(TF_BERT_CHECKPOINTS_UNZIP_CMD, None)
-            utils.exec_shell_cmd(TF_BERT_FP32_MODEL_WGET_CMD, None)
 
-        print("\n-- Required BERT models downloaded / already present..")
+        print("\n-- Downloading BERT FP32 model..")
+        utils.exec_shell_cmd(TF_BERT_FP32_MODEL_WGET_CMD, None)
+        
+        print("\n-- Required BERT models downloaded..")
 
     def download_resnet_models(self):
         if not os.path.exists('./models'):
             print("\n-- Downloading RESNET Intel_AI models..")
             utils.exec_shell_cmd(TF_RESNET_INTEL_AI_MODELS_CLONE_CMD, None)
+            # Until r2.9 branch of Resnet IntelAI models repo, inference was
+            # performed only on int8 precision.
+            # When the Resnet command is executed, it looks out for a file
+            # 'eval_image_classifier_inference_weight_sharing.py' to be present
+            # in below path.
+            # "models/image_recognition/tensorflow/resnet50v1_5/inference/"
+            # Now, with the latest branch (r2.11) of Resnet IntelAI models repo,
+            # inference is performed on few additional precisions and the above
+            # mentioned file is added for all precisions inside respective folders.
+            # Until dev team informs us as to what precision to run on, we will
+            # execute perf runs by checking out the older branch (r2.9) of the repo.
+            os.chdir('models')
+            print("\n-- Checking out RESNET models r2.9 branch..")
+            utils.exec_shell_cmd("git checkout r2.9", None)
+            os.chdir(self.workload_home_dir)
 
-        resnet_inte8_model_name = os.path.basename(TF_RESNET_INT8_MODEL_WGET_CMD.split()[1])
-        if not os.path.exists(resnet_inte8_model_name):
-            print("\n-- Downloading RESNET Pretrained model..")
-            utils.exec_shell_cmd(TF_RESNET_INT8_MODEL_WGET_CMD, None)
+        print("\n-- Downloading RESNET Pretrained model..")
+        utils.exec_shell_cmd(TF_RESNET_INT8_MODEL_WGET_CMD, None)
 
-        print("\n-- Required RESNET models downloaded / already present..")
+        print("\n-- Required RESNET models downloaded..")
 
     def build_and_install_workload(self, test_config_dict):
         print("\n###### In build_and_install_workload #####\n")
@@ -78,7 +93,8 @@ class TensorflowWorkload():
         manifest_cmd = "gramine-manifest -Dlog_level={} -Darch_libdir={} -Dentrypoint={} -Dpythondistpath={} \
                             python.manifest.template > python.manifest".format(
             LOG_LEVEL, os.environ.get('ARCH_LIBDIR'), entrypoint_path, pythondist_path)
-        
+        print("\n-- Generating manifest..\n", manifest_cmd)
+
         utils.exec_shell_cmd(manifest_cmd)
 
     def install_mimalloc(self):
@@ -103,6 +119,54 @@ class TensorflowWorkload():
         if not os.path.exists(MIMALLOC_INSTALL_PATH):
             raise Exception(f"\n-- Library {MIMALLOC_INSTALL_PATH} not generated/installed.\n")
 
+    def encrypt_models(self, test_config_dict, enc_key):
+        os.makedirs("./encrypted_models", exist_ok=True)
+        if test_config_dict['model_name'] == 'bert':
+            try: # Deleting old model if existing.
+                os.remove("encrypted_models/" + TF_BERT_FP32_MODEL_NAME)
+            except OSError:
+                pass
+            # We need to provide the absolute path of the output encrypted file within the below encrypt command.
+            encrypted_file = os.path.join(FRAMEWORK_HOME_DIR, test_config_dict['workload_home_dir'], "encrypted_models", TF_BERT_FP32_MODEL_NAME)
+            encrypt_cmd = f"gramine-sgx-pf-crypt encrypt -w {enc_key} -i data/{TF_BERT_FP32_MODEL_NAME} -o {encrypted_file}"
+            print("\n-- Encrypting BERT model..\n", encrypt_cmd)
+        elif test_config_dict['model_name'] == 'resnet':
+            try: # Deleting old model if existing.
+                os.remove("encrypted_models/" + TF_RESNET_INT8_MODEL_NAME)
+            except OSError:
+                pass
+            # We need to provide the absolute path of the output encrypted file within the below encrypt command.
+            encrypted_file = os.path.join(FRAMEWORK_HOME_DIR, test_config_dict['workload_home_dir'], "encrypted_models", TF_RESNET_INT8_MODEL_NAME)
+            encrypt_cmd = f"gramine-sgx-pf-crypt encrypt -w {enc_key} -i {TF_RESNET_INT8_MODEL_NAME} -o {encrypted_file}"
+            print("\n-- Encrypting RESNET model..\n", encrypt_cmd)
+        else:
+            raise Exception("Unknown tensorflow model for encryption! Please check the test yaml file..")
+        
+        utils.exec_shell_cmd(encrypt_cmd, None)
+
+    def update_manifest_entries(self, test_config_dict, hex_enc_key_dump):
+        manifest_filename = test_config_dict['manifest_name'] + ".manifest.template"
+        if test_config_dict['model_name'] == 'bert':
+            model_name = TF_BERT_FP32_MODEL_NAME
+        elif test_config_dict['model_name'] == 'resnet':
+            model_name = TF_RESNET_INT8_MODEL_NAME
+        else:
+            raise Exception("Unknown tensorflow model. Please check the test yaml file.")
+        
+        encrypted_file = os.path.join(FRAMEWORK_HOME_DIR, test_config_dict['workload_home_dir'], "encrypted_models", model_name)
+        search_str = "# encrypted file mount"
+        replace_str = "{ type = \"encrypted\", path = \"" + encrypted_file + "\", uri = \"file:" + encrypted_file + "\" },"
+        enc_file_mount_cmd = f"sed -i 's|{search_str}|{replace_str}|' {manifest_filename}"
+        utils.exec_shell_cmd(enc_file_mount_cmd, None)
+        search_str = "# encrypted insecure__keys"
+        replace_str = "fs.insecure__keys.default = \"" + hex_enc_key_dump + "\""
+        enc_insecure_keys_cmd = f"sed -i 's|{search_str}|{replace_str}|' {manifest_filename}"
+        utils.exec_shell_cmd(enc_insecure_keys_cmd, None)
+        search_str = "# encrypted allowed file"
+        replace_str = "\"file:" + encrypted_file + "\","
+        enc_allowed_file_cmd = f"sed -i 's|{search_str}|{replace_str}|' {manifest_filename}"
+        utils.exec_shell_cmd(enc_allowed_file_cmd, None)
+
     def pre_actions(self, test_config_dict):
         os.chdir(self.get_workload_home_dir())
         utils.set_threads_cnt_env_var()
@@ -112,12 +176,16 @@ class TensorflowWorkload():
         gramine_libs.update_manifest_file(test_config_dict)
 
     def setup_workload(self, test_config_dict):
-        self.download_workload(test_config_dict)
+        self.download_workload()
         self.build_and_install_workload(test_config_dict)
+        if os.environ['encryption'] == '1':
+            hex_enc_key_dump, enc_key = utils.gen_encryption_key()
+            self.update_manifest_entries(test_config_dict, hex_enc_key_dump)
+            self.encrypt_models(test_config_dict, enc_key)
         self.generate_manifest()
         gramine_libs.generate_sgx_token_and_sig(test_config_dict)
 
-    def construct_workload_exec_cmd(self, test_config_dict, exec_mode = 'native', iteration=1):
+    def construct_workload_exec_cmd(self, test_config_dict, input_model_file, exec_mode = 'native', iteration=1):
         tf_exec_cmd = None
         exec_mode_cmd = 'python3' if exec_mode == 'native' else exec_mode + ' python'
         taskset_str = f"0-{int(os.environ['CORES_PER_SOCKET']) - 1} "
@@ -137,7 +205,7 @@ class TensorflowWorkload():
                             " --predict_batch_size=" + str(test_config_dict['batch_size']) + \
                             " --experimental_gelu=True" + \
                             " --optimized_softmax=True" + \
-                            " --input_graph=data/fp32_bert_squad.pb" + \
+                            " --input_graph=" + input_model_file + \
                             " --do_predict=True --mode=benchmark" + \
                             " --inter_op_parallelism_threads=1" + \
                             " --intra_op_parallelism_threads=" + os.environ['CORES_PER_SOCKET'] + " | tee " + output_file_name
@@ -148,7 +216,7 @@ class TensorflowWorkload():
             tf_exec_cmd = "OMP_NUM_THREADS=" + os.environ['CORES_PER_SOCKET'] + " KMP_AFFINITY=granularity=fine,verbose,compact,1,0" + \
                             " taskset -c " + taskset_str + exec_mode_cmd + \
                             " models/models/image_recognition/tensorflow/resnet50v1_5/inference/eval_image_classifier_inference.py" + \
-                            " --input-graph=resnet50v1_5_int8_pretrained_model.pb" + \
+                            " --input-graph=" + input_model_file + \
                             " --num-inter-threads=1" + \
                             " --num-intra-threads=" + os.environ['CORES_PER_SOCKET'] + \
                             " --batch-size=" + str(test_config_dict['batch_size']) + \
@@ -175,8 +243,23 @@ class TensorflowWorkload():
     def execute_workload(self, tcd, e_mode, test_dict):
         print("\n##### In execute_workload #####\n")
 
+        if os.environ['encryption'] == '1' and e_mode == 'gramine-sgx':
+            if tcd['model_name'] == 'bert':
+                input_model_file = os.path.join(FRAMEWORK_HOME_DIR, tcd['workload_home_dir'], "encrypted_models", TF_BERT_FP32_MODEL_NAME)
+            elif tcd['model_name'] == 'resnet':
+                input_model_file = os.path.join(FRAMEWORK_HOME_DIR, tcd['workload_home_dir'], "encrypted_models", TF_RESNET_INT8_MODEL_NAME)
+            else:
+                raise Exception("Unknown tensorflow model. Please check the test yaml file.")
+        else:
+            if tcd['model_name'] == 'bert':
+                input_model_file = "data/" + TF_BERT_FP32_MODEL_NAME
+            elif tcd['model_name'] == 'resnet':
+                input_model_file = TF_RESNET_INT8_MODEL_NAME
+            else:
+                raise Exception("Unknown tensorflow model. Please check the test yaml file.")
+
         for j in range(tcd['iterations']):
-            self.command = self.construct_workload_exec_cmd(tcd, e_mode, j + 1)
+            self.command = self.construct_workload_exec_cmd(tcd, input_model_file, e_mode, j + 1)
 
             if self.command is None:
                 raise Exception(

@@ -8,6 +8,7 @@ import lsb_release
 import csv
 from datetime import datetime as dt
 import collections
+import pkg_resources
 import pandas as pd
 import socket
 import netifaces as ni
@@ -20,6 +21,8 @@ def verify_output(cmd_output, search_str): return re.search(search_str, cmd_outp
 
 # calculate the percent degradation
 def percent_degradation(tcd, baseline, testapp, throughput = False):
+    if float(baseline) == 0:
+        return 0
     if 'throughput' in tcd['test_name'] or throughput:
         return '{:0.3f}'.format(100 * (float(baseline) - float(testapp)) / float(baseline))
     else:
@@ -27,14 +30,16 @@ def percent_degradation(tcd, baseline, testapp, throughput = False):
 
 
 def exec_shell_cmd(cmd, stdout_val=subprocess.PIPE):
-    cmd_stdout = subprocess.run([cmd], shell=True, check=True, stdout=stdout_val, stderr=subprocess.STDOUT, universal_newlines=True)
-    if cmd_stdout.returncode != 0:
-        raise Exception(f"\n-- Failed to execute the process cmd: {cmd}")
+    try:
+        cmd_stdout = subprocess.run([cmd], shell=True, check=True, stdout=stdout_val, stderr=subprocess.STDOUT, universal_newlines=True)
 
-    if stdout_val is not None and cmd_stdout.stdout is not None:
-        return cmd_stdout.stdout.strip()
+        if stdout_val is not None and cmd_stdout.stdout is not None:
+            return cmd_stdout.stdout.strip()
 
-    return cmd_stdout
+        return cmd_stdout
+
+    except subprocess.CalledProcessError as e:
+        print(e.output)
 
 
 def read_config_yaml(config_file_path):
@@ -82,7 +87,7 @@ def clean_up_system():
     exec_shell_cmd("sudo apt-get -y clean", None)
     if os.path.exists("/var/run/docker.sock"):
         print("\n-- Removing all docker images..")
-        exec_shell_cmd("docker system prune -f --all", None)
+        exec_shell_cmd("docker system prune -f", None)
         if os.environ["perf_config"] == "baremetal":
             print("\n-- Stopping docker service..")
             exec_shell_cmd("sudo systemctl stop docker", None)
@@ -108,13 +113,16 @@ def set_permissions():
     else:
         print("\n-- Warning - Unable to find SGX dev files. May not be able to execute workload with SGX..")
     
+    logged_in_user = os.getlogin()
     if os.path.exists("/dev/cpu_dma_latency"):
-        logged_in_user = os.getlogin()
         exec_shell_cmd(f"sudo chown {logged_in_user} /dev/cpu_dma_latency")
         exec_shell_cmd("sudo chmod 0666 /dev/cpu_dma_latency")
 
     if os.path.exists("/var/run/docker.sock"):
+        exec_shell_cmd(f"sudo chown {logged_in_user} /var/run/docker.sock", None)
         exec_shell_cmd("sudo chmod 666 /var/run/docker.sock")
+    
+    exec_shell_cmd("sudo mount -o remount,exec /dev")
 
 
 def cleanup_gramine_binaries(build_prefix):
@@ -181,8 +189,18 @@ def update_env_variables(build_prefix):
     print(f"\n-- Updating 'SSHPASS' env-var\n")
     os.environ['SSHPASS'] = "intel@123"
 
+    print(f"\n-- Updating 'ARCH_LIBDIR' env-var\n")
     cmd_out = exec_shell_cmd('cc -dumpmachine')
     os.environ['ARCH_LIBDIR'] = "/lib/" + cmd_out
+
+    print(f"\n-- Updating 'LC_ALL' env-var\n")
+    os.environ['LC_ALL'] = "C.UTF-8"
+
+    print(f"\n-- Updating 'LANG' env-var\n")
+    os.environ['LANG'] = "C.UTF-8"
+	
+    os.environ['ENV_USER_UID'] = exec_shell_cmd('id -u')
+    os.environ['ENV_USER_GID'] = exec_shell_cmd('id -g')
 
 
 def set_http_proxies():
@@ -196,6 +214,12 @@ def set_http_proxies():
     os.environ['HTTPS_PROXY'] = HTTPS_PROXY
     print("\n-- Setting http_proxy : \n", os.environ['http_proxy'])
     print("\n-- Setting https_proxy : \n", os.environ['https_proxy'])
+
+
+def set_no_proxy():
+    os.environ['no_proxy'] = NO_PROXY
+    os.environ['NO_PROXY'] = NO_PROXY
+    print("\n-- Setting no_proxy : \n", os.environ['no_proxy'])
 
 
 def set_cpu_freq_scaling_governor():
@@ -221,17 +245,22 @@ def set_threads_cnt_env_var():
     """
     lscpu_output = exec_shell_cmd('lscpu')
     lines = lscpu_output.splitlines()
-    core_per_socket, threads_per_core = 0, 0
+    cores_count, core_per_socket, threads_per_core = 0, 0, 0
     for line in lines:
+        if 'CPU(s):' in line:
+            cores_count = int(line.split(':')[-1].strip())
         if 'Core(s) per socket:' in line:
             core_per_socket = int(line.split(':')[-1].strip())
         if 'Thread(s) per core:' in line:
             threads_per_core = int(line.split(':')[-1].strip())
-        if core_per_socket and threads_per_core:
+        if cores_count and core_per_socket and threads_per_core:
             break
+    
+    os.environ['CORES_COUNT'] = str(cores_count)
     os.environ['THREADS_CNT'] = str(core_per_socket * threads_per_core)
     os.environ['CORES_PER_SOCKET'] = str(core_per_socket)
 
+    print("\n-- Setting the CORES_COUNT env variable to ", os.environ['CORES_COUNT'])
     print("\n-- Setting the THREADS_CNT env variable to ", os.environ['THREADS_CNT'])
     print("\n-- Setting the CORES_PER_SOCKET env variable to ", os.environ['CORES_PER_SOCKET'])
 
@@ -278,17 +307,23 @@ def write_to_report(workload_name, test_results):
             generic_dict[k] = test_results[k]
 
     now = dt.isoformat(dt.now()).replace(":","_")
-    report_name = os.path.join(PERF_RESULTS_DIR, "Gramine_Performance_Data_" + now + ".xlsx")
+    if workload_name == 'Tensorflow' and os.environ['encryption'] == '1':
+        workload_name = 'Tensorflow_Encrypted'
+    report_name = os.path.join(PERF_RESULTS_DIR, "Gramine_" + workload_name + "_Perf_Data_" + now + ".xlsx")
     if not os.path.exists(PERF_RESULTS_DIR): os.makedirs(PERF_RESULTS_DIR)
     if os.path.exists(report_name):
         writer = pd.ExcelWriter(report_name, engine='openpyxl', mode='a')
     else:
         writer = pd.ExcelWriter(report_name, engine='openpyxl')
     
-    if workload_name == 'Redis':
+    if workload_name == 'Redis' or workload_name == 'Memcached':
         cols = ['native', 'gramine-sgx-single-thread-non-exitless', 'gramine-sgx-diff-core-exitless', 'gramine-direct', \
                 'native-avg', 'sgx-single-thread-avg', 'sgx-diff-core-exitless-avg', 'direct-avg', \
                 'sgx-single-thread-deg', 'sgx-diff-core-exitless-deg', 'direct-deg']
+    elif workload_name == 'Sklearnex':
+        cols = ['data_type', 'dataset_name', 'rows', 'columns', 'classes', 'time', 'gramine-sgx', 'gramine-direct', 'gramine-sgx-deg', 'gramine-direct-deg']
+    elif workload_name == 'TensorflowServing' or workload_name == 'MySql':
+        cols = ['native', 'gramine-sgx', 'native-avg', 'sgx-avg', 'sgx-deg']
     else:
         cols = ['native', 'gramine-sgx', 'gramine-direct', 'native-avg', 'sgx-avg', 'direct-avg', 'sgx-deg', 'direct-deg']
 
@@ -306,7 +341,12 @@ def write_to_report(workload_name, test_results):
             latency_df.to_excel(writer, sheet_name=workload_name)
     
     if len(generic_dict) > 0:
-        generic_df = pd.DataFrame.from_dict(generic_dict, orient='index', columns=cols).dropna(axis=1)
+        if workload_name == 'Sklearnex':
+            generic_df = pd.DataFrame.from_dict({(i,j): generic_dict[i][j] for i in generic_dict.keys() for j in generic_dict[i].keys()},
+                                                orient='index', columns=cols)
+            generic_df.rename(columns={'time':'native'}, inplace=True)
+        else:
+            generic_df = pd.DataFrame.from_dict(generic_dict, orient='index', columns=cols).dropna(axis=1)
         generic_df.columns = generic_df.columns.str.upper()
         generic_df.to_excel(writer, sheet_name=workload_name)
 
@@ -381,8 +421,41 @@ def popen_subprocess(command, dest_dir=None):
         os.chdir(dest_dir)
 
     print("Starting Process ", command)
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True, encoding='utf-8')
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True, encoding='utf-8')
     time.sleep(1)
    
     if dest_dir: os.chdir(cwd)
     return process
+
+
+def gen_encryption_key():
+    enc_key_name = "encryption_key"
+    exec_shell_cmd("gramine-sgx-pf-crypt gen-key -w " + enc_key_name)
+    hex_enc_key_dump = exec_shell_cmd("xxd -p " + enc_key_name)
+    return hex_enc_key_dump, enc_key_name
+
+
+def is_package_installed(package_name):
+    installed_packages = pkg_resources.working_set
+    installed_packages_list = sorted(["%s==%s" % (i.key, i.version) for i in installed_packages])
+    if any(package_name in j for j in installed_packages_list):
+        return True
+    else:
+        return False
+
+def read_file(filename):
+    fd = open(filename)
+    fd_contents = fd.read()
+    fd.close()
+    return fd_contents
+
+def update_file_contents(old_contents, new_contents, filename, append=False):
+    fd_contents = read_file(filename)
+    if append:
+        old_data = (old_contents).join(re.search("(.*){}(.*)".format(old_contents), fd_contents).groups())
+        new_data = re.sub(old_data, new_contents+old_data, fd_contents)
+    else:
+        new_data = re.sub(old_contents, new_contents, fd_contents)
+    fd = open(filename, "w")
+    fd.write(new_data)
+    fd.close()

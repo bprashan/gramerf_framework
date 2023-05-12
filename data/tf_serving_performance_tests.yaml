@@ -1,0 +1,7 @@
+Default:
+  docker_image: tensorflow-serving tf-serving-base
+  workload_name: "TensorflowServing"
+  
+test_tf_serving_perf_resnet_latency:
+  create_local_image: "y"
+  docker_arguments: --model_name="resnet" --model_base_path="/models/resnet"

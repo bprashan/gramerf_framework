@@ -1,5 +1,6 @@
 def g_gramerf_lib
 def g_nodelabel
+env.isSklearn = false
 
 pipeline {
     agent none
@@ -37,20 +38,40 @@ pipeline {
             }
             steps {
                 script {
+                    cleanWs()
                     checkout scm
+                    exec_cmd = ''
+                    def args = "--ignore=gramine --disable-warnings --perf_config=${perf_config} --build_gramine=${build_gramine} --commit_id=${gramine_repo_commit_id} --iterations=${iterations} --exec_mode=${exec_mode}"
+                    echo "is encryption needed : $encryption"
+                    if (encryption) {
+                        args = args + " --encryption=1"
+                    }
+
                     if (!run_specific_perf_test?.trim()){
                         echo " selected marker $run will be executed"
-                        sh "python3 -m pytest -s -v -m $run --ignore=gramine --disable-warnings --perf_config=${perf_config} --build_gramine=${build_gramine} --commit_id=${gramine_repo_commit_id} --iterations=${iterations} --exec_mode=${exec_mode}"
+                        exec_cmd = "python3 -m pytest -s -v -m $run $args"
                     } else {
                         echo " specific performance test $run_specific_perf_test will be executed"
-                        sh "python3 -m pytest -s -v -k $run_specific_perf_test --ignore=gramine --disable-warnings --perf_config=${perf_config} --build_gramine=${build_gramine} --commit_id=${gramine_repo_commit_id} --iterations=${iterations} --exec_mode=${exec_mode}"
+                        exec_cmd = "python3 -m pytest -s -v -k $run_specific_perf_test $args"
+                    }
+                    
+                    if(isSklearn.toBoolean()){
+                        g_gramerf_lib.run_sklearn_perf(exec_cmd)
+                    } else {
+                        sh "$exec_cmd"
                     }
                 }
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'logs/*, results/*'
+                    script {
+                        if (isSklearn.toBoolean()){
+                            archiveArtifacts artifacts: 'sklearn_reports/**/*'
+                        } else {
+                            archiveArtifacts artifacts: 'logs/*, results/*'
+                        }
                     // cleanWs()
+                    }
                 }
             }
         }

@@ -1,1 +1,3 @@
 from docker_benchmarking.workloads.redis_workload import RedisWorkload
+from docker_benchmarking.workloads.tf_serving_workload import TensorflowServingWorkload
+from docker_benchmarking.workloads.mysql_workload import MySqlWorkload

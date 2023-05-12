@@ -1,0 +1,61 @@
+# Intel(R) Extension for Scikit-learn* manifest example
+
+loader.entrypoint = "file:{{ gramine.libos }}"
+libos.entrypoint = "{{ entrypoint }}"
+
+loader.log_level = "{{ log_level }}"
+
+loader.env.LD_LIBRARY_PATH = "/lib:{{ arch_libdir }}:/usr/{{ arch_libdir }}:{{ python.stdlib }}/lib:/home/user/.local/lib"
+
+loader.env.HOME = "{{ env.HOME }}"
+
+loader.insecure__use_cmdline_argv = true
+
+loader.env.OMP_NUM_THREADS = "8"
+
+loader.uid = {{ env_user_uid }}
+loader.gid = {{ env_user_gid }}
+
+sys.stack.size = "8M"
+sys.enable_extra_runtime_domain_names_conf = true
+
+fs.mounts = [
+  { path = "{{ entrypoint }}", uri = "file:{{ entrypoint }}" },
+  { path = "/lib", uri = "file:{{ gramine.runtimedir() }}" },
+  { path = "{{ arch_libdir }}", uri = "file:{{ arch_libdir }}" },
+  { path = "/usr/{{ arch_libdir }}", uri = "file:/usr/{{ arch_libdir }}" },
+{% for path in python.get_sys_path(entrypoint) %}
+  { path = "{{ path }}", uri = "file:{{ path }}" },
+{% endfor %}
+
+  # scikit-learn and its dependencies install shared libs under this path (e.g. daal4py package
+  # installs libonedal_core.so lib); note that we use `/home/user/` prefix inside Gramine and
+  # specify this prefix in LD_LIBRARY_PATH envvar above
+  { path = "/home/user/.local", uri = "file:{{ env.HOME }}/.local" },
+    
+  { type = "tmpfs", path = "/tmp" },
+  { path = "/usr", uri = "file:/usr" },
+  { path = "/etc", uri = "file:/etc" },
+  { path = "/data", uri = "file:data" },
+  { path = "/configs", uri = "file:configs" },
+  { path = "/sklearn_bench", uri = "file:sklearn_bench" },
+  { path = "/datasets", uri = "file:datasets" },
+
+]
+
+# Added 'sgx.file_check_policy' for performance benchmarking as suggested by dev team,
+# and modified 'enclave_size' and 'thread_num' values to '64G' and '256' respectively.
+sgx.file_check_policy = "allow_all_but_log"
+sgx.enclave_size = "64G"
+sgx.max_threads = 256
+
+sgx.trusted_files = [
+  "file:{{ gramine.libos }}",
+  "file:{{ entrypoint }}",
+  "file:{{ gramine.runtimedir() }}/",
+  "file:{{ arch_libdir }}/",
+  "file:/usr/{{ arch_libdir }}/",
+  "file:/usr/",
+  "file:/etc/",
+
+]
