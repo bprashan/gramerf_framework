@@ -44,6 +44,9 @@ def getNodeName(){
         echo "sklearn workload is selected ..."
         env.isSklearn = true
         return 'graphene_sklearn'
+    } else if (run_specific_perf_test.contains("memcached") || run.contains("memcached")){
+        echo "memcached workload is selected ..."
+        return 'graphene_perf_redis_taken_out_for_vasanth'
     }
 
 }
